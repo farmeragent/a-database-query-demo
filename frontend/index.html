@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agricultural Hex Query System</title>
+
+    <!-- Deck.gl and dependencies -->
+    <script src="https://unpkg.com/deck.gl@latest/dist.min.js"></script>
+    <script src="https://unpkg.com/@deck.gl/core@latest/dist.min.js"></script>
+    <script src="https://unpkg.com/@deck.gl/layers@latest/dist.min.js"></script>
+    <script src="https://unpkg.com/@deck.gl/geo-layers@latest/dist.min.js"></script>
+
+    <!-- Mapbox GL for base map -->
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
+
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Map Section -->
+        <div class="map-section">
+            <div id="map-container"></div>
+            <div id="tooltip" class="tooltip"></div>
+        </div>
+
+        <!-- Chat Section -->
+        <div class="chat-section">
+            <div class="chat-header">
+                <h2>Query Assistant</h2>
+                <button id="clear-btn" class="clear-btn">Clear History</button>
+            </div>
+
+            <div class="chat-messages" id="chat-messages">
+                <div class="message bot-message">
+                    <div class="message-content">
+                        <p>👋 Hi! I can help you query your agricultural hex data. Try asking:</p>
+                        <ul>
+                            <li>"Show me hexes with low phosphorus"</li>
+                            <li>"What's the average yield target?"</li>
+                            <li>"Find hexes that need more than 100 units of nitrogen"</li>
+                            <li>"Show hexes with high yield and low potassium"</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chat-input-container">
+                <input
+                    type="text"
+                    id="chat-input"
+                    placeholder="Ask a question about your field data..."
+                    autocomplete="off"
+                />
+                <button id="send-btn" class="send-btn">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="api.js"></script>
+    <script src="map.js"></script>
+    <script src="chat.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
