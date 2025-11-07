@@ -30,9 +30,14 @@ class DatabaseConnection:
         """Connect to DuckDB database"""
         if self.conn is None:
             self.conn = duckdb.connect(self.db_path, read_only=False)
+            if os.getenv("ENVIRONMENT", None) == "production":
+                current_directory = os.getenv("HOME", "/tmp")
+                self.conn.execute(f"SET home_directory='{current_directory}';")
+                self.conn.execute(f"SET secret_directory='{current_directory}/secrets_dir';")
+                self.conn.execute(f"SET extension_directory='{current_directory}/extensions_dir';")
             # Load spatial extension
-            self.conn.execute("INSTALL spatial;")
-            self.conn.execute("LOAD spatial;")
+            self.conn.install_extension("spatial");
+            self.conn.load_extension("spatial");
         return self.conn
 
     def close(self):
