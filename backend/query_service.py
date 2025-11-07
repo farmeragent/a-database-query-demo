@@ -22,52 +22,73 @@ class QueryService:
     def _build_system_prompt(self) -> str:
         """Build system prompt with database schema"""
         schema_info = self.db.get_schema_info()
-
-        columns_desc = "\n".join([
-            f"  - {col['name']}: {col['type']}"
-            for col in schema_info['columns']
-        ])
-
         stats = schema_info['stats']
 
-        return f"""You are a SQL query generator for an agricultural database. Your job is to convert user questions into valid DuckDB SQL queries.
+        # Build column descriptions from rich metadata
+        columns_desc = []
+        for col in schema_info.get('columns', []):
+            col_info = f"  - {col['name']} ({col.get('type', 'VARCHAR')})"
+            if 'description' in col:
+                col_info += f": {col['description']}"
+            if 'unit' in col:
+                col_info += f" [{col['unit']}]"
+            if 'thresholds' in col:
+                thresholds = col['thresholds']
+                col_info += f"\n    Thresholds: Low {thresholds.get('low', '')}, Medium {thresholds.get('medium', '')}, High {thresholds.get('high', '')}"
+            if 'notes' in col:
+                col_info += f"\n    Note: {col['notes']}"
+            columns_desc.append(col_info)
 
-Database Schema:
+        columns_text = "\n".join(columns_desc)
+
+        # Build query hints section
+        query_hints = schema_info.get('query_hints', [])
+        hints_text = "\n".join([f"{i+1}. {hint}" for i, hint in enumerate(query_hints)])
+
+        # Build domain knowledge section
+        domain_knowledge = schema_info.get('domain_knowledge', [])
+        domain_text = "\n".join([f"- {fact}" for fact in domain_knowledge])
+
+        # Build the prompt
+        prompt = f"""You are a SQL query generator for an agricultural database. Your job is to convert user questions into valid DuckDB SQL queries.
+
+Database: {schema_info.get('description', 'Agricultural hex data')}
+
 Table: {schema_info['table_name']}
+
 Columns:
-{columns_desc}
+{columns_text}
 
 Database Statistics:
 - Total hexes: {stats['total_hexes']:,}
-- Yield range: {stats['min_yield']} - {stats['max_yield']}
-- Average P in soil: {stats['avg_P']}
-- Average K in soil: {stats['avg_K']}
-- Average N in soil: {stats['avg_N']}
+- Yield range: {stats['min_yield']} - {stats['max_yield']} bu/ac
+- Average P in soil: {stats['avg_P']} ppm
+- Average K in soil: {stats['avg_K']} ppm
+- Average N in soil: {stats['avg_N']} ppm
+"""
 
-Field Descriptions:
-- h3_index: Unique H3 hexagon identifier
-- yield_target: Target crop yield for the hex
-- P_in_soil, K_in_soil, N_in_soil: Current nutrient levels (Phosphorus, Potassium, Nitrogen)
-- N_to_apply, P_to_apply, K_to_apply: Recommended nutrient application amounts
-- geometry: Spatial polygon for the hexagon
+        if hints_text:
+            prompt += f"\nQuery Guidelines:\n{hints_text}\n"
 
-Guidelines:
-1. ALWAYS include h3_index in the SELECT clause (needed for map highlighting)
-2. Use ROUND() for decimal values in aggregations
-3. For "low" nutrients, use thresholds: P < 60, K < 180, N < 10
-4. For "high" nutrients, use thresholds: P > 90, K > 250, N > 0
-5. Return ONLY the SQL query, no explanations or markdown
-6. Use proper DuckDB SQL syntax
-7. For counting, use COUNT(*) or COUNT(h3_index)
-8. When user asks "show me" or "find", always include h3_index
-9. For spatial queries, the geometry column contains POLYGON data
+        if domain_text:
+            prompt += f"\nDomain Knowledge:\n{domain_text}\n"
+
+        prompt += """
+Important Rules:
+- ALWAYS include h3_index in SELECT when showing/finding specific hexes (needed for map highlighting)
+- Return ONLY the SQL query, no explanations or markdown code blocks
+- Use proper DuckDB SQL syntax
+- Use ROUND() for decimal values in aggregations
+- When comparing fields, use GROUP BY field_name
 
 Example Queries:
-- "Show hexes with low phosphorus" → SELECT h3_index, P_in_soil FROM agricultural_hexes WHERE P_in_soil < 60
-- "What's the average yield?" → SELECT ROUND(AVG(yield_target), 2) as avg_yield FROM agricultural_hexes
-- "High yield hexes needing nitrogen" → SELECT h3_index, yield_target, N_to_apply FROM agricultural_hexes WHERE yield_target >= 240 AND N_to_apply > 280
+- "Show hexes with low phosphorus" → SELECT h3_index, field_name, P_in_soil FROM agricultural_hexes WHERE P_in_soil < 60
+- "Which field has the lowest phosphorus?" → SELECT field_name, ROUND(AVG(P_in_soil), 2) as avg_P FROM agricultural_hexes GROUP BY field_name ORDER BY avg_P ASC LIMIT 1
+- "Compare fields by average phosphorus" → SELECT field_name, ROUND(AVG(P_in_soil), 2) as avg_P FROM agricultural_hexes GROUP BY field_name ORDER BY avg_P
 
 Return only valid SQL. Do not include markdown code blocks or explanations."""
+
+        return prompt
 
     def _extract_sql(self, response: str) -> str:
         """Extract SQL from Claude's response, handling markdown code blocks"""
